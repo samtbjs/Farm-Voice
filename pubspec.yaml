@@ -1,0 +1,23 @@
+name: kisan_alert
+description: "A new Flutter project."
+publish_to: 'none'
+version: 0.1.0+1
+
+environment:
+  sdk: ^3.12.1
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_tts: ^4.2.5
+  google_generative_ai: ^0.4.0  # Official Google Gemini SDK
+  image_picker: ^1.1.2          # For the "Scan Crop" camera button
+  speech_to_text: ^7.4.0        # For the "Tap & Speak" voice button
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
