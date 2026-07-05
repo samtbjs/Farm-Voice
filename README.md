@@ -16,7 +16,7 @@ Farmers routinely lose crops to preventable disease and make planting/irrigation
 
 - **📸 Scan Crop** — Take a photo of a diseased or struggling crop and get an instant AI diagnosis: likely disease, confidence, and clear remediation steps.
 - **🎙️ Tap & Speak** — Ask a farming question by voice or by typing, in your preferred language, and get a short, practical advisory back.
-- **🔊 Voice-First, Not Text-First** — Every AI response can be read aloud via text-to-speech, so literacy is never a barrier to getting help.
+- **🔊 Voice-First, Not Text-First** — Every AI response can be read aloud via text to speech, so literacy is never a barrier to getting help.
 - **🌐 Multilingual by Design** — Select from Indic languages (Hindi, Tamil, Telugu, Marathi, Kannada, English) for both speech recognition and spoken responses.
 - **📋 Expert Escalation (Prototype)** — Flag a diagnosis for human follow up, simulating a direct link to a local Rythu Seva Kendra (Farmer Service Centre) for cases needing expert attention.
 - **⚡ Fast, Focused UX** — A two-button home dashboard gets farmers into the flow they need in one tap, with clear loading and error states throughout.
