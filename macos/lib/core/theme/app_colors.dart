@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-/// Core colors for the Kisan Support app.
+/// Core colors for the Farm Voice app.
 ///
 /// Kept to a small, deliberate set: green for the "speak" action,
 /// amber for the "scan" action, plus basic neutrals.

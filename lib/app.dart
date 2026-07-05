@@ -10,7 +10,7 @@ class KisanSupportApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Kisan Support',
+      title: 'Farm Voice',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light(),
       home: const HomeScreen(),

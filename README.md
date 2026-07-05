@@ -1,14 +1,14 @@
-# 🌾 Kisan Support
+# 🌾 Farm Voice
 
-**AI-powered crop diagnosis and voice advisory for Indian farmers — built for Build with AI: Code for Communities (Track 4 — Kisan Alert), by Google Cloud & Hack2Skill.**
+**AI-powered crop diagnosis and voice advisory for Indian farmers built for Build with AI: Code for Communities (Track 4 — Kisan Alert), by Google Cloud & Hack2Skill.**
 
-Kisan Support puts a multilingual agricultural expert in every farmer's pocket. Photograph a sick crop and get an instant AI diagnosis, or simply speak a question in your own language and get a clear, practical answer back — spoken aloud, no reading required.
+Farm Voice puts a multilingual agricultural expert in every farmer's pocket. Photograph a sick crop and get an instant AI diagnosis, or simply speak a question in your own language and get a clear, practical answer back spoken aloud, no reading required.
 
 ---
 
 ## 📌 Why This Exists
 
-Farmers routinely lose crops to preventable disease and make planting/irrigation decisions based on habit or hearsay rather than data — not because the knowledge doesn't exist, but because it's locked behind text, English, and internet-search literacy that many small and marginal farmers don't have easy access to. Kisan Support closes that gap using Gemini's multimodal AI as the actual engine: point a camera at a leaf, or just talk, and get an answer in your own language, spoken back to you.
+Farmers routinely lose crops to preventable disease and make planting/irrigation decisions based on habit or hearsay rather than data, not because the knowledge doesn't exist, but because it's locked behind text, English, and internet-search literacy that many small and marginal farmers don't have easy access to. Farm Voice closes that gap using Gemini's multimodal AI as the actual engine: point a camera at a leaf, or just talk, and get an answer in your own language, spoken back to you.
 
 ---
 
@@ -18,7 +18,7 @@ Farmers routinely lose crops to preventable disease and make planting/irrigation
 - **🎙️ Tap & Speak** — Ask a farming question by voice or by typing, in your preferred language, and get a short, practical advisory back.
 - **🔊 Voice-First, Not Text-First** — Every AI response can be read aloud via text-to-speech, so literacy is never a barrier to getting help.
 - **🌐 Multilingual by Design** — Select from Indic languages (Hindi, Tamil, Telugu, Marathi, Kannada, English) for both speech recognition and spoken responses.
-- **📋 Expert Escalation (Prototype)** — Flag a diagnosis for human follow-up, simulating a direct link to a local Rythu Seva Kendra (Farmer Service Centre) for cases needing expert attention.
+- **📋 Expert Escalation (Prototype)** — Flag a diagnosis for human follow up, simulating a direct link to a local Rythu Seva Kendra (Farmer Service Centre) for cases needing expert attention.
 - **⚡ Fast, Focused UX** — A two-button home dashboard gets farmers into the flow they need in one tap, with clear loading and error states throughout.
 
 ---
