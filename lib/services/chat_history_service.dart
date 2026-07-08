@@ -2,33 +2,25 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/language_option.dart';
 
 /// A single saved message. Photos are intentionally not persisted here
-/// (see the top-level explanation) — only text and the crop-diagnosis /
-/// flagged flags survive a reload.
+/// (see the top-level explanation) — only the text and sender role
+/// survive a reload.
 class StoredMessage {
   StoredMessage({
     required this.isUser,
     required this.text,
-    this.isCropDiagnosis = false,
-    this.isFlagged = false,
   });
 
   final bool isUser;
   final String text;
-  final bool isCropDiagnosis;
-  final bool isFlagged;
 
   Map<String, dynamic> toMap() => {
         'isUser': isUser,
         'text': text,
-        'isCropDiagnosis': isCropDiagnosis,
-        'isFlagged': isFlagged,
       };
 
   factory StoredMessage.fromMap(Map<String, dynamic> map) => StoredMessage(
         isUser: map['isUser'] as bool? ?? false,
         text: map['text'] as String? ?? '',
-        isCropDiagnosis: map['isCropDiagnosis'] as bool? ?? false,
-        isFlagged: map['isFlagged'] as bool? ?? false,
       );
 }
 

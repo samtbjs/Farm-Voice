@@ -1,8 +1,8 @@
 import 'dart:typed_data';
 
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
-import 'package:flutter_tts/flutter_tts.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 
@@ -10,7 +10,7 @@ import '../core/theme/app_colors.dart';
 import '../models/language_option.dart';
 import '../services/chat_history_service.dart';
 import '../services/gemini_service.dart';
-import '../utils/tts_helpers.dart';
+import '../utils/web_camera_capture.dart';
 import '../widgets/advisory_bubbles.dart';
 import '../widgets/chat_input_bar.dart';
 import '../widgets/processing_overlay.dart';
@@ -47,49 +47,30 @@ class AdvisoryChatScreen extends StatefulWidget {
 /// A single message in the thread.
 ///
 /// User entries optionally carry the real photo bytes that were sent
-/// alongside the text, so the bubble can show a thumbnail. Advisory
-/// (AI) entries track whether they came from a crop-photo diagnosis
-/// (to show the expert-escalation button) and whether that diagnosis
-/// has already been flagged.
+/// alongside the text, so the bubble can show a thumbnail.
 class _ChatEntry {
-  _ChatEntry.user({required this.text, this.imageBytes})
-      : isUser = true,
-        isCropDiagnosis = false,
-        isFlagged = false;
+  _ChatEntry.user({required this.text, this.imageBytes}) : isUser = true;
 
-  _ChatEntry.advisory({
-    required this.text,
-    this.isCropDiagnosis = false,
-    this.isFlagged = false,
-  })  : isUser = false,
-        imageBytes = null;
+  _ChatEntry.advisory({required this.text}) : isUser = false, imageBytes = null;
 
   final bool isUser;
   final String text;
   final Uint8List? imageBytes;
-  final bool isCropDiagnosis;
-  bool isFlagged;
 }
 
 class _AdvisoryChatScreenState extends State<AdvisoryChatScreen> {
-  // TODO: replace with real district lookup post-hackathon (ported
-  // as-is from the old CropResultScreen's mock flag confirmation).
-  static const String _mockDistrictName = 'Warangal';
-
   final TextEditingController _controller = TextEditingController();
   final List<_ChatEntry> _thread = [];
 
   final ImagePicker _picker = ImagePicker();
   final GeminiService _geminiService = GeminiService();
   final stt.SpeechToText _speech = stt.SpeechToText();
-  final FlutterTts _tts = FlutterTts();
 
   Uint8List? _attachedPhoto;
   bool _isRecording = false;
   bool _speechAvailable = false;
   bool _isProcessing = false;
   String _processingMessage = '';
-  int? _speakingIndex;
 
   /// Set once the first message of a brand-new chat is saved, or
   /// immediately from [widget.conversationId] when reopening one.
@@ -106,13 +87,7 @@ class _AdvisoryChatScreenState extends State<AdvisoryChatScreen> {
         if (stored.isUser) {
           _thread.add(_ChatEntry.user(text: stored.text));
         } else {
-          _thread.add(
-            _ChatEntry.advisory(
-              text: stored.text,
-              isCropDiagnosis: stored.isCropDiagnosis,
-              isFlagged: stored.isFlagged,
-            ),
-          );
+          _thread.add(_ChatEntry.advisory(text: stored.text));
         }
       }
     }
@@ -124,7 +99,6 @@ class _AdvisoryChatScreenState extends State<AdvisoryChatScreen> {
   void dispose() {
     _controller.dispose();
     _speech.stop();
-    _tts.stop();
     super.dispose();
   }
 
@@ -208,16 +182,30 @@ class _AdvisoryChatScreenState extends State<AdvisoryChatScreen> {
 
   Future<void> _pickImage(ImageSource source) async {
     try {
-      final XFile? photo = await _picker.pickImage(
-        source: source,
-        imageQuality: 85,
-        maxWidth: 1600,
-      );
+      Uint8List? bytes;
 
-      // Farmer backed out of the camera/gallery without picking a photo.
-      if (photo == null) return;
+      // On web, image_picker's "camera" source just opens the same
+      // file-picker as "gallery" on desktop browsers (the `capture`
+      // hint it relies on is mostly a mobile-browser-only behavior).
+      // Route it through a real getUserMedia camera preview instead
+      // so "Take Photo" actually opens the webcam on web too.
+      if (kIsWeb && source == ImageSource.camera) {
+        bytes = await captureFromWebCamera(context);
+      } else {
+        final XFile? photo = await _picker.pickImage(
+          source: source,
+          imageQuality: 85,
+          maxWidth: 1600,
+        );
 
-      final Uint8List bytes = await photo.readAsBytes();
+        // Farmer backed out of the camera/gallery without picking a photo.
+        if (photo == null) return;
+
+        bytes = await photo.readAsBytes();
+      }
+
+      // Farmer canceled the web camera dialog without capturing.
+      if (bytes == null) return;
 
       if (!mounted) return;
       setState(() => _attachedPhoto = bytes);
@@ -298,62 +286,31 @@ class _AdvisoryChatScreenState extends State<AdvisoryChatScreen> {
           : 'Getting your advisory…';
     });
 
+    // Everything already in the thread *before* this new message is
+    // the conversation's memory — send it along so Gemini remembers
+    // earlier turns (e.g. the farmer's name, or a crop mentioned a
+    // few messages back) instead of answering as if this were the
+    // very first message every single time.
+    final List<ChatTurn> history = _thread
+        .take(_thread.length - 1)
+        .map((e) => ChatTurn(isUser: e.isUser, text: e.text))
+        .toList();
+
     final String response = hasPhoto
         ? await _geminiService.analyzeCropImage(
             photoBytes,
             extraContext: text.isEmpty ? null : text,
+            language: widget.language,
           )
-        : await _geminiService.getVoiceAdvisory(text, widget.language);
+        : await _geminiService.getVoiceAdvisory(text, widget.language, history);
 
     if (!mounted) return;
 
-    final int newEntryIndex = _thread.length;
     setState(() {
-      _thread.add(
-        _ChatEntry.advisory(text: response, isCropDiagnosis: hasPhoto),
-      );
+      _thread.add(_ChatEntry.advisory(text: response));
       _isProcessing = false;
     });
 
-    _speak(newEntryIndex, response);
-    _persistConversation();
-  }
-
-  Future<void> _speak(int index, String text) async {
-    if (!mounted) return;
-    setState(() => _speakingIndex = index);
-
-    try {
-      final result = await _tts.setLanguage(ttsLocaleFor(widget.language));
-      if (result != 1) {
-        await _tts.setLanguage('en-IN');
-      }
-    } catch (_) {
-      // Requested language isn't installed on this device — fall back
-      // to English silently rather than crashing.
-      try {
-        await _tts.setLanguage('en-IN');
-      } catch (_) {
-        // Even English isn't available — speak() below will no-op.
-      }
-    }
-
-    try {
-      await _tts.speak(stripMarkdownForSpeech(text));
-    } catch (_) {
-      // No TTS engine/voice available on this device — fail silently.
-      // The response is still fully readable on screen.
-    }
-
-    if (mounted && _speakingIndex == index) {
-      setState(() => _speakingIndex = null);
-    }
-  }
-
-  void _flagForFollowUp(int index) {
-    // Mock state only — no backend call is made (ported as-is from
-    // the old CropResultScreen).
-    setState(() => _thread[index].isFlagged = true);
     _persistConversation();
   }
 
@@ -369,12 +326,7 @@ class _AdvisoryChatScreenState extends State<AdvisoryChatScreen> {
           .createConversation(uid: uid, language: widget.language);
 
       final messages = _thread
-          .map((e) => StoredMessage(
-                isUser: e.isUser,
-                text: e.text,
-                isCropDiagnosis: e.isCropDiagnosis,
-                isFlagged: e.isFlagged,
-              ))
+          .map((e) => StoredMessage(isUser: e.isUser, text: e.text))
           .toList();
 
       await ChatHistoryService.instance.saveMessages(
@@ -463,36 +415,7 @@ class _AdvisoryChatScreenState extends State<AdvisoryChatScreen> {
                                 );
                               }
 
-                              final bool canReplay =
-                                  _speakingIndex == null || _speakingIndex == index;
-
-                              return Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  AdvisoryBubble(
-                                    text: entry.text,
-                                    isSpeaking: _speakingIndex == index,
-                                    onReplay:
-                                        canReplay ? () => _speak(index, entry.text) : null,
-                                  ),
-                                  if (entry.isCropDiagnosis) ...[
-                                    const SizedBox(height: 10),
-                                    Padding(
-                                      padding: const EdgeInsets.only(left: 46),
-                                      child: entry.isFlagged
-                                          ? _FlaggedNotice(districtName: _mockDistrictName)
-                                          : OutlinedButton.icon(
-                                              onPressed: () => _flagForFollowUp(index),
-                                              icon: const Icon(
-                                                Icons.support_agent_rounded,
-                                                size: 18,
-                                              ),
-                                              label: const Text('Flag for Expert Follow-up'),
-                                            ),
-                                    ),
-                                  ],
-                                ],
-                              );
+                              return AdvisoryBubble(text: entry.text);
                             },
                           ),
                   ),
@@ -524,51 +447,6 @@ class _AdvisoryChatScreenState extends State<AdvisoryChatScreen> {
           ],
         ),
       ),
-    );
-  }
-}
-
-class _FlaggedNotice extends StatelessWidget {
-  const _FlaggedNotice({required this.districtName});
-
-  final String districtName;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const OutlinedButton(
-          onPressed: null,
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.check_circle_outline_rounded),
-              SizedBox(width: 8),
-              Text('Flagged ✓'),
-            ],
-          ),
-        ),
-        const SizedBox(height: 10),
-        Card(
-          color: AppColors.green.withValues(alpha: 0.08),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              children: [
-                const Icon(Icons.check_circle_rounded, color: AppColors.green),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    'Flagged for expert follow-up ✓ Rythu Seva Kendra, $districtName',
-                    style: Theme.of(context).textTheme.bodyLarge,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ],
     );
   }
 }

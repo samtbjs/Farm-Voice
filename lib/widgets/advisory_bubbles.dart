@@ -61,8 +61,7 @@ class QueryBubble extends StatelessWidget {
 }
 
 /// Gemini's advisory response, shown as a left-aligned green-tinted
-/// bubble with a small AI avatar and a replay/speaker icon so the
-/// farmer can hear the response again on demand.
+/// bubble with a small AI avatar.
 ///
 /// [text] is rendered with [MarkdownLiteText] since crop-diagnosis
 /// responses come back with light markdown formatting (bold labels,
@@ -71,21 +70,9 @@ class AdvisoryBubble extends StatelessWidget {
   const AdvisoryBubble({
     super.key,
     required this.text,
-    this.isSpeaking = false,
-    this.onReplay,
   });
 
   final String text;
-
-  /// True while this specific bubble's response is currently being
-  /// spoken aloud — used to swap the speaker icon and disable the
-  /// button so two responses can't be spoken over each other.
-  final bool isSpeaking;
-
-  /// Called when the farmer taps the speaker icon to hear this
-  /// response again. Null hides/disables the button (e.g. while
-  /// another bubble is speaking).
-  final VoidCallback? onReplay;
 
   @override
   Widget build(BuildContext context) {
@@ -121,28 +108,7 @@ class AdvisoryBubble extends StatelessWidget {
                 bottomRight: Radius.circular(16),
               ),
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                MarkdownLiteText(data: text),
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: IconButton(
-                    onPressed: onReplay,
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
-                    icon: Icon(
-                      isSpeaking
-                          ? Icons.volume_up_rounded
-                          : Icons.volume_up_outlined,
-                      color: AppColors.green,
-                      size: 20,
-                    ),
-                    tooltip: 'Replay',
-                  ),
-                ),
-              ],
-            ),
+            child: MarkdownLiteText(data: text),
           ),
         ),
       ],

@@ -6,6 +6,16 @@ import 'package:google_generative_ai/google_generative_ai.dart';
 
 import '../models/language_option.dart';
 
+/// One prior turn of a conversation, used to give Gemini memory of
+/// what was already said via [GeminiService.getVoiceAdvisory]'s
+/// `history` param.
+class ChatTurn {
+  const ChatTurn({required this.isUser, required this.text});
+
+  final bool isUser;
+  final String text;
+}
+
 /// Wraps all calls to the Gemini API behind two simple methods so the
 /// rest of the app never has to think about prompts, models, or error
 /// handling directly.
@@ -60,12 +70,26 @@ class GeminiService {
   /// Gemini reasons about the photo and the farmer's note together in
   /// one response.
   ///
+  /// When [language] is provided, Gemini is explicitly instructed to
+  /// respond in that language, just like [getVoiceAdvisory]. When
+  /// omitted, it defaults to English.
+  ///
   /// Never throws — on any failure (no internet, blocked response,
   /// API error) it returns a short, farmer-readable error message
   /// instead, so the UI never crashes.
-  Future<String> analyzeCropImage(Uint8List imageBytes, {String? extraContext}) async {
+  Future<String> analyzeCropImage(
+    Uint8List imageBytes, {
+    String? extraContext,
+    LanguageOption? language,
+  }) async {
     try {
-      final parts = <Part>[TextPart(_cropAnalysisPrompt)];
+      final languageInstruction = language != null
+          ? _languageInstruction(language)
+          : 'IMPORTANT: No language preference was specified, so respond '
+          'only in English.';
+      final parts = <Part>[
+        TextPart('$_cropAnalysisPrompt\n\n$languageInstruction'),
+      ];
       if (extraContext != null && extraContext.trim().isNotEmpty) {
         parts.add(
           TextPart(
@@ -105,6 +129,14 @@ class GeminiService {
   /// Sends [farmerQuery] (typed or transcribed from speech) to Gemini
   /// and returns a short spoken-style advisory.
   ///
+  /// [history] is the prior turns of *this* conversation, oldest
+  /// first — e.g. built from the screen's `_thread` or from
+  /// [StoredMessage]s loaded off a saved conversation. Pass it so
+  /// Gemini actually remembers earlier exchanges (like the farmer's
+  /// name, or "that crop we discussed") instead of treating every
+  /// message as the start of a brand-new conversation. Leave it null
+  /// or empty for the first message of a chat.
+  ///
   /// When [language] is provided, Gemini is explicitly instructed to
   /// respond in that language by name, rather than relying on it
   /// mirroring the language of [farmerQuery]. When omitted (the
@@ -116,6 +148,7 @@ class GeminiService {
   Future<String> getVoiceAdvisory(
     String farmerQuery, [
     LanguageOption? language,
+    List<ChatTurn>? history,
   ]) async {
     try {
       final instruction = language != null
@@ -126,7 +159,15 @@ class GeminiService {
       final promptText = '$instruction\n\n$farmerQuery';
       debugPrint('GEMINI PROMPT >>> $promptText');
 
-      final content = [Content.text(promptText)];
+      final content = <Content>[
+        // Earlier turns of this same conversation, so Gemini has
+        // memory of what was already said (names, crops, prior
+        // advice, etc.) instead of starting fresh every message.
+        if (history != null)
+          for (final turn in history)
+            turn.isUser ? Content.text(turn.text) : Content.model([TextPart(turn.text)]),
+        Content.text(promptText),
+      ];
 
       final response = await _voiceModel
           .generateContent(content)
