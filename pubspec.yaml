@@ -13,6 +13,10 @@ dependencies:
   google_generative_ai: ^0.4.0  # Official Google Gemini SDK
   image_picker: ^1.1.2          # For the "Scan Crop" camera button
   speech_to_text: ^7.4.0        # For the "Tap & Speak" voice button
+  firebase_core: ^4.11.0
+  firebase_auth: ^6.5.3
+  cloud_firestore: ^6.6.0
+  google_sign_in: ^7.2.0
 
 dev_dependencies:
   flutter_test:
