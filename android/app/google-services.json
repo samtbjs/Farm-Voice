@@ -1,0 +1,54 @@
+{
+  "project_info": {
+    "project_number": "980083554601",
+    "project_id": "farm-voice-01",
+    "storage_bucket": "farm-voice-01.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:980083554601:android:a1897e1652992c39871f38",
+        "android_client_info": {
+          "package_name": "com.example.kisan_alert"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "980083554601-lrab78uti3jhjjb42vkhv1htvciphjks.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.kisan_alert",
+            "certificate_hash": "1e597900797303918eb74b1906ec7efc4af8908c"
+          }
+        },
+        {
+          "client_id": "980083554601-j38ea82g48v6t2jasqebohd950blf39e.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAvW3t7GO9yu3yCjGkL13bAU7CF3bu1LvU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "980083554601-j38ea82g48v6t2jasqebohd950blf39e.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "980083554601-8mc2h7ofmvf1k773uvp2fmc7lin0bk5b.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.kisanAlert"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

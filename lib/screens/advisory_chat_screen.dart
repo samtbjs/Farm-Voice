@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:image_picker/image_picker.dart';
@@ -7,6 +8,7 @@ import 'package:speech_to_text/speech_to_text.dart' as stt;
 
 import '../core/theme/app_colors.dart';
 import '../models/language_option.dart';
+import '../services/chat_history_service.dart';
 import '../services/gemini_service.dart';
 import '../utils/tts_helpers.dart';
 import '../widgets/advisory_bubbles.dart';
@@ -22,28 +24,21 @@ import '../widgets/processing_overlay.dart';
 /// chat doesn't support switching languages mid-conversation; start
 /// a new chat instead.
 ///
-/// Fully wired to real logic:
-/// - Camera icon -> [ImagePicker] (same pattern as the old
-///   CameraScreen) -> real image bytes -> [GeminiService.analyzeCropImage].
-/// - Mic icon -> [stt.SpeechToText] (same init/listen pattern as the
-///   old VoiceScreen) using [language.localeId] -> transcribed text ->
-///   [GeminiService.getVoiceAdvisory].
-/// - Typed text with no photo -> [GeminiService.getVoiceAdvisory].
-/// - Typed text + photo together -> the text is passed to
-///   [GeminiService.analyzeCropImage] as `extraContext` so Gemini
-///   reasons about the photo and the farmer's note in one response,
-///   rather than firing two separate calls or silently dropping one
-///   of the two inputs.
-/// - Every AI response is spoken aloud automatically via
-///   [FlutterTts] (same locale-mapping + en-IN fallback pattern as
-///   the old VoiceResultScreen/CropResultScreen), with a per-bubble
-///   replay button.
-/// - "Flag for Expert Follow-up" appears under crop-diagnosis
-///   responses specifically (ported from the old CropResultScreen).
+/// [conversationId] and [initialMessages] are set when reopening a
+/// past conversation from Home's "Recent" list; both are left null
+/// for a brand-new chat, in which case a new Firestore document is
+/// created the first time something is sent.
 class AdvisoryChatScreen extends StatefulWidget {
-  const AdvisoryChatScreen({super.key, required this.language});
+  const AdvisoryChatScreen({
+    super.key,
+    required this.language,
+    this.conversationId,
+    this.initialMessages,
+  });
 
   final LanguageOption language;
+  final String? conversationId;
+  final List<StoredMessage>? initialMessages;
 
   @override
   State<AdvisoryChatScreen> createState() => _AdvisoryChatScreenState();
@@ -62,10 +57,12 @@ class _ChatEntry {
         isCropDiagnosis = false,
         isFlagged = false;
 
-  _ChatEntry.advisory({required this.text, this.isCropDiagnosis = false})
-      : isUser = false,
-        imageBytes = null,
-        isFlagged = false;
+  _ChatEntry.advisory({
+    required this.text,
+    this.isCropDiagnosis = false,
+    this.isFlagged = false,
+  })  : isUser = false,
+        imageBytes = null;
 
   final bool isUser;
   final String text;
@@ -94,9 +91,32 @@ class _AdvisoryChatScreenState extends State<AdvisoryChatScreen> {
   String _processingMessage = '';
   int? _speakingIndex;
 
+  /// Set once the first message of a brand-new chat is saved, or
+  /// immediately from [widget.conversationId] when reopening one.
+  String? _activeConversationId;
+
   @override
   void initState() {
     super.initState();
+    _activeConversationId = widget.conversationId;
+
+    final initial = widget.initialMessages;
+    if (initial != null && initial.isNotEmpty) {
+      for (final stored in initial) {
+        if (stored.isUser) {
+          _thread.add(_ChatEntry.user(text: stored.text));
+        } else {
+          _thread.add(
+            _ChatEntry.advisory(
+              text: stored.text,
+              isCropDiagnosis: stored.isCropDiagnosis,
+              isFlagged: stored.isFlagged,
+            ),
+          );
+        }
+      }
+    }
+
     _initSpeech();
   }
 
@@ -132,16 +152,69 @@ class _AdvisoryChatScreenState extends State<AdvisoryChatScreen> {
     setState(() => _speechAvailable = available);
   }
 
+  /// Shows a small picker so the farmer can choose between taking a
+  /// new photo or picking an existing one from the gallery, then
+  /// hands off to [_pickImage] with the chosen source.
   Future<void> _attachPhoto() async {
     if (_isProcessing) return;
+
+    final ImageSource? source = await showModalBottomSheet<ImageSource>(
+      context: context,
+      backgroundColor: AppColors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (sheetContext) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(height: 8),
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: AppColors.border,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(height: 12),
+              ListTile(
+                leading: const Icon(
+                  Icons.camera_alt_rounded,
+                  color: AppColors.amber,
+                ),
+                title: const Text('Take Photo'),
+                onTap: () => Navigator.of(sheetContext).pop(ImageSource.camera),
+              ),
+              ListTile(
+                leading: const Icon(
+                  Icons.photo_library_rounded,
+                  color: AppColors.amber,
+                ),
+                title: const Text('Choose from Gallery'),
+                onTap: () => Navigator.of(sheetContext).pop(ImageSource.gallery),
+              ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        );
+      },
+    );
+
+    if (source == null) return;
+    await _pickImage(source);
+  }
+
+  Future<void> _pickImage(ImageSource source) async {
     try {
       final XFile? photo = await _picker.pickImage(
-        source: ImageSource.camera,
+        source: source,
         imageQuality: 85,
         maxWidth: 1600,
       );
 
-      // Farmer backed out of the camera without taking a photo.
+      // Farmer backed out of the camera/gallery without picking a photo.
       if (photo == null) return;
 
       final Uint8List bytes = await photo.readAsBytes();
@@ -150,10 +223,12 @@ class _AdvisoryChatScreenState extends State<AdvisoryChatScreen> {
       setState(() => _attachedPhoto = bytes);
     } catch (e) {
       if (!mounted) return;
+      final String sourceLabel =
+          source == ImageSource.camera ? 'camera' : 'gallery';
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
+        SnackBar(
           content: Text(
-            'Could not open the camera. Please check camera permission '
+            'Could not open the $sourceLabel. Please check permissions '
             'and try again.',
           ),
         ),
@@ -241,6 +316,7 @@ class _AdvisoryChatScreenState extends State<AdvisoryChatScreen> {
     });
 
     _speak(newEntryIndex, response);
+    _persistConversation();
   }
 
   Future<void> _speak(int index, String text) async {
@@ -278,6 +354,39 @@ class _AdvisoryChatScreenState extends State<AdvisoryChatScreen> {
     // Mock state only — no backend call is made (ported as-is from
     // the old CropResultScreen).
     setState(() => _thread[index].isFlagged = true);
+    _persistConversation();
+  }
+
+  /// Saves the whole thread under the signed-in account. Creates the
+  /// Firestore conversation document on the very first save of a new
+  /// chat, then just overwrites it on every later exchange.
+  Future<void> _persistConversation() async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
+
+    try {
+      _activeConversationId ??= await ChatHistoryService.instance
+          .createConversation(uid: uid, language: widget.language);
+
+      final messages = _thread
+          .map((e) => StoredMessage(
+                isUser: e.isUser,
+                text: e.text,
+                isCropDiagnosis: e.isCropDiagnosis,
+                isFlagged: e.isFlagged,
+              ))
+          .toList();
+
+      await ChatHistoryService.instance.saveMessages(
+        uid: uid,
+        conversationId: _activeConversationId!,
+        messages: messages,
+      );
+    } catch (_) {
+      // Saving history should never crash the chat itself — the
+      // farmer can keep chatting even if a save attempt fails (e.g.
+      // no network connection right now).
+    }
   }
 
   @override
