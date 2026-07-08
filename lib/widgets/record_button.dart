@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import '../core/theme/app_colors.dart';
 
-/// One massive circular button used to start/stop recording on the
-/// Voice screen. Purely visual — wire up real recording later.
+/// A large circular microphone button used on the Voice screen.
 class RecordButton extends StatelessWidget {
   const RecordButton({
     super.key,

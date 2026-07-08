@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'core/theme/app_theme.dart';
-import 'screens/home_screen.dart';
+import 'screens/sign_in_screen.dart';
 
-/// Top-level app widget: applies the theme and opens straight into
-/// the two-button Home dashboard.
-class KisanSupportApp extends StatelessWidget {
-  const KisanSupportApp({super.key});
+/// Top-level app widget: applies the theme and opens into Sign In,
+/// which leads to Home, which leads into the combined Advisory chat.
+class FarmVoiceApp extends StatelessWidget {
+  const FarmVoiceApp({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -13,7 +13,7 @@ class KisanSupportApp extends StatelessWidget {
       title: 'Farm Voice',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light(),
-      home: const HomeScreen(),
+      home: const SignInScreen(),
     );
   }
 }

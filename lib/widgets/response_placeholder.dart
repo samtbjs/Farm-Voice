@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import '../core/theme/app_colors.dart';
 
-/// A clean placeholder box where the AI's text/voice response will be
-/// rendered once the backend is connected.
+/// A clean placeholder box where the AI response will be shown.
 class ResponsePlaceholder extends StatelessWidget {
   const ResponsePlaceholder({super.key, this.text = 'AI Response will appear here...'});
 

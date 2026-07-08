@@ -2,11 +2,6 @@ import 'package:flutter/material.dart';
 import '../core/theme/app_colors.dart';
 
 /// A rounded text field for typing a question instead of speaking it.
-///
-/// Styled to match [LanguageDropdown] (same border, radius, surface
-/// fill) so it reads as part of the same input group rather than a
-/// bolted-on extra. The trailing send button is only enabled once
-/// there's text to submit.
 class TextQueryField extends StatelessWidget {
   const TextQueryField({
     super.key,

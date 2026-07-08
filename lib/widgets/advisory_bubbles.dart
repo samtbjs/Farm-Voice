@@ -1,11 +1,20 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import '../core/theme/app_colors.dart';
+import 'markdown_lite_text.dart';
 
 /// The farmer's own question, shown as a plain right-aligned bubble.
+///
+/// If [imageBytes] is provided (the farmer attached a crop photo,
+/// with or without typed/spoken text alongside it), a small thumbnail
+/// is shown above the text so the conversation reflects exactly what
+/// was sent.
 class QueryBubble extends StatelessWidget {
-  const QueryBubble({super.key, required this.text});
+  const QueryBubble({super.key, required this.text, this.imageBytes});
 
   final String text;
+  final Uint8List? imageBytes;
 
   @override
   Widget build(BuildContext context) {
@@ -13,7 +22,7 @@ class QueryBubble extends StatelessWidget {
       alignment: Alignment.centerRight,
       child: Container(
         constraints: const BoxConstraints(maxWidth: 320),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(
           color: AppColors.textDark,
           borderRadius: const BorderRadius.only(
@@ -22,9 +31,29 @@ class QueryBubble extends StatelessWidget {
             bottomLeft: Radius.circular(16),
           ),
         ),
-        child: Text(
-          'You asked: $text',
-          style: const TextStyle(color: Colors.white, fontSize: 15),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            if (imageBytes != null) ...[
+              ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: Image.memory(
+                  imageBytes!,
+                  width: 160,
+                  height: 160,
+                  fit: BoxFit.cover,
+                ),
+              ),
+              const SizedBox(height: 8),
+            ],
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              child: Text(
+                'You asked: $text',
+                style: const TextStyle(color: Colors.white, fontSize: 15),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -32,11 +61,31 @@ class QueryBubble extends StatelessWidget {
 }
 
 /// Gemini's advisory response, shown as a left-aligned green-tinted
-/// bubble with a small AI avatar.
+/// bubble with a small AI avatar and a replay/speaker icon so the
+/// farmer can hear the response again on demand.
+///
+/// [text] is rendered with [MarkdownLiteText] since crop-diagnosis
+/// responses come back with light markdown formatting (bold labels,
+/// bullet remediation steps).
 class AdvisoryBubble extends StatelessWidget {
-  const AdvisoryBubble({super.key, required this.text});
+  const AdvisoryBubble({
+    super.key,
+    required this.text,
+    this.isSpeaking = false,
+    this.onReplay,
+  });
 
   final String text;
+
+  /// True while this specific bubble's response is currently being
+  /// spoken aloud — used to swap the speaker icon and disable the
+  /// button so two responses can't be spoken over each other.
+  final bool isSpeaking;
+
+  /// Called when the farmer taps the speaker icon to hear this
+  /// response again. Null hides/disables the button (e.g. while
+  /// another bubble is speaking).
+  final VoidCallback? onReplay;
 
   @override
   Widget build(BuildContext context) {
@@ -61,7 +110,7 @@ class AdvisoryBubble extends StatelessWidget {
         Flexible(
           child: Container(
             constraints: const BoxConstraints(maxWidth: 280),
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
             decoration: BoxDecoration(
               color: AppColors.green.withValues(alpha: 0.10),
               border: Border.all(color: AppColors.green.withValues(alpha: 0.25)),
@@ -72,9 +121,27 @@ class AdvisoryBubble extends StatelessWidget {
                 bottomRight: Radius.circular(16),
               ),
             ),
-            child: Text(
-              text,
-              style: Theme.of(context).textTheme.bodyLarge,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                MarkdownLiteText(data: text),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: IconButton(
+                    onPressed: onReplay,
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                    icon: Icon(
+                      isSpeaking
+                          ? Icons.volume_up_rounded
+                          : Icons.volume_up_outlined,
+                      color: AppColors.green,
+                      size: 20,
+                    ),
+                    tooltip: 'Replay',
+                  ),
+                ),
+              ],
             ),
           ),
         ),

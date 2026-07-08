@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:typed_data';
 import '../secrets.dart';
 import 'package:flutter/foundation.dart';
 
@@ -54,17 +53,31 @@ class GeminiService {
   /// Sends [imageBytes] to Gemini for crop-disease analysis and
   /// returns the model's markdown-formatted response.
   ///
+  /// If the farmer also typed or spoke something alongside the photo,
+  /// pass it as [extraContext] — it's appended to the vision prompt
+  /// as additional context (e.g. "the leaves started turning yellow
+  /// last week") rather than triggering a separate text-only call, so
+  /// Gemini reasons about the photo and the farmer's note together in
+  /// one response.
+  ///
   /// Never throws — on any failure (no internet, blocked response,
   /// API error) it returns a short, farmer-readable error message
   /// instead, so the UI never crashes.
-  Future<String> analyzeCropImage(Uint8List imageBytes) async {
+  Future<String> analyzeCropImage(Uint8List imageBytes, {String? extraContext}) async {
     try {
-      final content = [
-        Content.multi([
-          TextPart(_cropAnalysisPrompt),
-          DataPart('image/jpeg', imageBytes),
-        ]),
-      ];
+      final parts = <Part>[TextPart(_cropAnalysisPrompt)];
+      if (extraContext != null && extraContext.trim().isNotEmpty) {
+        parts.add(
+          TextPart(
+            'The farmer also added this note along with the photo: '
+            '"${extraContext.trim()}". Take it into account in your '
+            'analysis and remediation steps.',
+          ),
+        );
+      }
+      parts.add(DataPart('image/jpeg', imageBytes));
+
+      final content = [Content.multi(parts)];
 
       final response = await _visionModel
           .generateContent(content)
@@ -105,9 +118,12 @@ class GeminiService {
     LanguageOption? language,
   ]) async {
     try {
-      final promptText = language == null
-          ? farmerQuery
-          : '${_languageInstruction(language)}\n\n$farmerQuery';
+      final instruction = language != null
+          ? _languageInstruction(language)
+          : 'IMPORTANT: No language preference was specified, so respond '
+          'only in English regardless of the language used in the '
+          'farmer\'s question below.';
+      final promptText = '$instruction\n\n$farmerQuery';
       debugPrint('GEMINI PROMPT >>> $promptText');
 
       final content = [Content.text(promptText)];

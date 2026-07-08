@@ -74,7 +74,20 @@ class _VoiceScreenState extends State<VoiceScreen> {
     setState(() => _speechAvailable = available);
   }
 
+bool _ensureLanguageSelected() {
+    if (_selectedLanguage != null) return true;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Please choose a language before asking your question.'),
+      ),
+    );
+    return false;
+  }
+
+
+
   Future<void> _toggleRecording() async {
+    if (!_ensureLanguageSelected()) return;
     if (!_speechAvailable) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -107,32 +120,36 @@ class _VoiceScreenState extends State<VoiceScreen> {
   }
 
   void _submitTypedQuery(String query) {
+    if (!_ensureLanguageSelected()) return;
     _queryController.clear();
     FocusScope.of(context).unfocus();
     _handleQuery(query);
   }
 
-  Future<void> _handleQuery(String query) async {
-    setState(() => _isProcessing = true);
+Future<void> _handleQuery(String query) async {
+  setState(() => _isProcessing = true);
+  debugPrint('SELECTED LANGUAGE >>> ${_selectedLanguage?.label}');
 
-    final response = await _geminiService.getVoiceAdvisory(query);
+  final response =
+      await _geminiService.getVoiceAdvisory(query, _selectedLanguage);
 
-    if (!mounted) return;
+  if (!mounted) return;
 
-    setState(() {
-      _isProcessing = false;
-      _responseText = response;
-    });
+  setState(() {
+    _isProcessing = false;
+    _responseText = response;
+  });
 
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => VoiceResultScreen(
-          query: query,
-          responseText: response,
-        ),
+  Navigator.of(context).push(
+    MaterialPageRoute(
+      builder: (_) => VoiceResultScreen(
+        query: query,
+        responseText: response,
+        language: _selectedLanguage,
       ),
-    );
-  }
+    ),
+  );
+}
 
   @override
   Widget build(BuildContext context) {
